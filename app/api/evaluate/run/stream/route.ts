@@ -18,6 +18,11 @@ import { testCaseFromRow } from "@/lib/test-case-from-row";
 import { buildAutofillRunMetadata } from "@/lib/run-metadata-autofill";
 import { getAnthropicEvalApiKey } from "@/lib/eval-llm-env";
 import { DEFAULT_EVAL_LLM_MODEL } from "@/lib/eval-llm-defaults";
+import {
+  assertEvalResultsPersisted,
+  buildSessionRunMetadata,
+  insertEvalResultOrFail,
+} from "@/lib/eval-result-storage";
 
 export const maxDuration = 300;
 
@@ -159,7 +164,7 @@ export async function POST(request: Request) {
     mode: sessionMode,
     manually_edited: false,
     context_bundle_id: contextBundleId,
-    run_metadata: runMetadata,
+    run_metadata: buildSessionRunMetadata(runMetadata),
   } as Database["public"]["Tables"]["test_sessions"]["Insert"];
   const { data: sessionRow, error: sessionError } = await supabase
     .from("test_sessions")
@@ -232,7 +237,7 @@ export async function POST(request: Request) {
               try {
                 await supabase
                   .from("test_sessions")
-                  .update({ run_metadata: { ...(runMetadata as any), code_source: evrenCodeSourceText } } as never)
+                  .update({ run_metadata: buildSessionRunMetadata(runMetadata, evrenCodeSourceText) } as never)
                   .eq("session_id", sessionId);
               } catch {
                 /* best-effort */
@@ -340,7 +345,14 @@ export async function POST(request: Request) {
               manually_edited: false,
               behavior_review: behaviorReview,
             } as Database["public"]["Tables"]["eval_results"]["Insert"];
-            await supabase.from("eval_results").insert(evalPayload as any);
+            await insertEvalResultOrFail(supabase, evalPayload, {
+              sessionId,
+              testCaseUuid: row.id,
+              testCaseId: testCase.test_case_id,
+              testCaseTitle: testCase.title,
+              evalStartMs,
+              logPrefix: "[evaluate/run/stream]",
+            });
           } else {
             let behaviorReview: Record<string, unknown> = {};
             if (apiKey) {
@@ -380,7 +392,14 @@ export async function POST(request: Request) {
               manually_edited: false,
               behavior_review: behaviorReview,
             } as Database["public"]["Tables"]["eval_results"]["Insert"];
-            await supabase.from("eval_results").insert(evalPayload as any);
+            await insertEvalResultOrFail(supabase, evalPayload, {
+              sessionId,
+              testCaseUuid: row.id,
+              testCaseId: testCase.test_case_id,
+              testCaseTitle: testCase.title,
+              evalStartMs,
+              logPrefix: "[evaluate/run/stream]",
+            });
           }
 
           completedCount++;
@@ -392,6 +411,8 @@ export async function POST(request: Request) {
             message: `Completed ${completedCount} of ${total}`,
           });
         });
+
+        await assertEvalResultsPersisted(supabase, sessionId, total, evalStartMs, "[evaluate/run/stream]");
 
         const richReportInputs = richSlots.filter((s): s is RichSlot => s != null);
 

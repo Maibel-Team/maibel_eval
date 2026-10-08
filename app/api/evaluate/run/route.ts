@@ -19,6 +19,11 @@ import { testCaseFromRow } from "@/lib/test-case-from-row";
 import { buildAutofillRunMetadata } from "@/lib/run-metadata-autofill";
 import { getAnthropicEvalApiKey } from "@/lib/eval-llm-env";
 import { DEFAULT_EVAL_LLM_MODEL } from "@/lib/eval-llm-defaults";
+import {
+  assertEvalResultsPersisted,
+  buildSessionRunMetadata,
+  insertEvalResultOrFail,
+} from "@/lib/eval-result-storage";
 
 export const maxDuration = 300;
 
@@ -102,7 +107,7 @@ export async function POST(request: Request) {
     mode: sessionMode,
     manually_edited: false,
     context_bundle_id: contextBundleId,
-    run_metadata: runMetadata,
+    run_metadata: buildSessionRunMetadata(runMetadata),
   } as Database["public"]["Tables"]["test_sessions"]["Insert"];
   const { data: sessionRow, error: sessionError } = await supabase
     .from("test_sessions")
@@ -126,6 +131,7 @@ export async function POST(request: Request) {
   const maxConcurrentTestCases = getMaxConcurrentTestCases(runCount);
   let evrenCodeSourceText: string | null = null;
 
+  try {
   await runWithConcurrency(rows, maxConcurrentTestCases, async (row, index) => {
     const testCase: TestCase = testCaseFromRow(row);
 
@@ -149,7 +155,7 @@ export async function POST(request: Request) {
         try {
           await supabase
             .from("test_sessions")
-            .update({ run_metadata: { ...(runMetadata as any), code_source: evrenCodeSourceText } } as never)
+            .update({ run_metadata: buildSessionRunMetadata(runMetadata, evrenCodeSourceText) } as never)
             .eq("session_id", sessionId);
         } catch {
           /* best-effort */
@@ -238,7 +244,14 @@ export async function POST(request: Request) {
         manually_edited: false,
         behavior_review: behaviorReview,
       } as Database["public"]["Tables"]["eval_results"]["Insert"];
-      await supabase.from("eval_results").insert(evalPayload as any);
+      await insertEvalResultOrFail(supabase, evalPayload, {
+        sessionId,
+        testCaseUuid: row.id,
+        testCaseId: testCase.test_case_id,
+        testCaseTitle: testCase.title,
+        evalStartMs,
+        logPrefix: "[evaluate/run]",
+      });
     } else {
       let behaviorReview: Record<string, unknown> = {};
       if (apiKey) {
@@ -278,9 +291,18 @@ export async function POST(request: Request) {
         manually_edited: false,
         behavior_review: behaviorReview,
       } as Database["public"]["Tables"]["eval_results"]["Insert"];
-      await supabase.from("eval_results").insert(evalPayload as any);
+      await insertEvalResultOrFail(supabase, evalPayload, {
+        sessionId,
+        testCaseUuid: row.id,
+        testCaseId: testCase.test_case_id,
+        testCaseTitle: testCase.title,
+        evalStartMs,
+        logPrefix: "[evaluate/run]",
+      });
     }
   });
+
+  await assertEvalResultsPersisted(supabase, sessionId, rows.length, evalStartMs, "[evaluate/run]");
 
   const richReportInputs = richSlots.filter((s): s is RichSlot => s != null);
 
@@ -351,4 +373,15 @@ export async function POST(request: Request) {
     title: title ?? undefined,
     summary: summary ?? undefined,
   });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Run failed";
+    console.error("[evaluate/run] Error:", message, err);
+    return NextResponse.json(
+      {
+        error: message,
+        test_session_id: testSessionId,
+      },
+      { status: 500 }
+    );
+  }
 }
