@@ -1,4 +1,6 @@
 -- Maibel Eval – PostgreSQL schema (e.g. Supabase)
+-- Single source of truth: run this once on an empty Supabase project to get the full current schema
+-- (all former schema-migration-*.sql files are folded in).
 -- Uses lowercase, unquoted table/column names so PostgREST exposes public.test_cases, etc. in the schema cache.
 
 -- Extensions (Supabase usually has these)
@@ -71,6 +73,11 @@ CREATE TABLE test_sessions (
   repeated_runs_mode TEXT NOT NULL DEFAULT 'auto' CHECK (repeated_runs_mode IN ('auto', 'manual')),
   -- Structured run provenance: environment, code source, deploy URL, models, run mode, sample size, repeated-run evidence (TASK-022).
   run_metadata       JSONB NOT NULL DEFAULT '{}'::jsonb,
+  -- Fingerprint of per-row comparison JSON when session_review_summary was last aligned.
+  session_review_summary_basis_fingerprint TEXT,
+  -- Context pack used for the run (see lib/context-pack.ts).
+  context_bundle_id  TEXT,
+  context_extended_enabled BOOLEAN,
   created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -90,6 +97,8 @@ CREATE TABLE eval_results (
   cost_usd           DOUBLE PRECISION,
   manually_edited    BOOLEAN NOT NULL DEFAULT FALSE,
   behavior_review    JSONB NOT NULL DEFAULT '{}'::jsonb,
+  -- Pairwise comparator output (lib/comparator.ts).
+  comparison         JSONB,
   created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -140,6 +149,44 @@ CREATE TRIGGER eval_results_updated_at
   BEFORE UPDATE ON eval_results FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER default_settings_updated_at
   BEFORE UPDATE ON default_settings FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- =============================================================================
+-- AUTH SYNC: create a public.users row whenever a Supabase Auth user is created.
+-- The first user becomes the owner.
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION public.handle_new_auth_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  is_first boolean;
+BEGIN
+  SELECT (SELECT count(*) FROM public.users) = 0 INTO is_first;
+
+  INSERT INTO public.users (user_id, email, full_name, is_owner)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.email, NEW.id::text),
+    COALESCE(
+      NEW.raw_user_meta_data->>'full_name',
+      NEW.raw_user_meta_data->>'name'
+    ),
+    is_first
+  )
+  ON CONFLICT (user_id) DO NOTHING;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_auth_user();
 
 -- =============================================================================
 -- INDEXES (optional, for common lookups)

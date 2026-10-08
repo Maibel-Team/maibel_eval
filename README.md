@@ -47,7 +47,7 @@ Copy `.env.example` to `.env.local` and fill in:
 
 ### 3. Database
 
-Use a Supabase project and apply the schema in **this directory**: start with `schema.sql`, then apply `schema-migration-*.sql`, `schema-behavior-review.sql`, `schema-rls-authenticated.sql`, and other `schema-*.sql` files as needed for your environment. Tables include `users`, `categories`, `test_cases`, `test_sessions`, `eval_results`, `session_result_snapshots`, and related review/summary columns.
+Create a Supabase project and run **`schema.sql`** once in the SQL Editor. It contains the full current schema (tables, RLS policies, grants and the auth → `users` sync trigger). Tables include `users`, `categories`, `test_cases`, `test_sessions`, `eval_results`, `session_result_snapshots`, and related review/summary columns.
 
 ### 4. Run the app
 
@@ -82,4 +82,4 @@ By default, point this eval app at **staging** for Evren integration and testing
 - `content/prompts/` — System prompts for evaluator, summarizer, base
 - `context/md-files/` — Organization context markdown and `CONTEXT_PACK_MANIFEST.md` for evaluator/comparator injection
 - `docs/` — e.g. Evren API spec
-- `schema.sql`, `schema-migration-*.sql`, `schema-*.sql` — Database schema and migrations
+- `schema.sql` — Full database schema
