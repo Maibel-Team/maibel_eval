@@ -1,3 +1,4 @@
+import { isEvrenFlashModel } from "@/lib/evren-models";
 import { createClient } from "@/lib/supabase/server";
 import { getMaxConcurrentTestCases, runWithConcurrency } from "@/lib/evren-concurrency";
 import { callEvrenApiWithMeta } from "@/lib/evren";
@@ -98,6 +99,7 @@ export async function POST(
   let body: {
     version_name?: string;
     run_count?: number;
+    evren_flash_model?: string;
     run_comparison?: boolean;
   } = {};
   try {
@@ -106,6 +108,9 @@ export async function POST(
     /* empty body is fine */
   }
   const runComparison = body.run_comparison ?? false;
+  if (body.evren_flash_model !== undefined && !isEvrenFlashModel(body.evren_flash_model)) {
+    return Response.json({ error: "Unsupported Evren Flash model" }, { status: 400 });
+  }
   const runCount = Number.isFinite(body.run_count) ? Math.max(1, Math.floor(body.run_count as number)) : 1;
 
   const supabase = await createClient();
@@ -237,7 +242,7 @@ export async function POST(
 
           const testCase: TestCase = testCaseFromRow(tc);
 
-          const runPromises = Array.from({ length: runCount }, async () => callEvrenApiWithMeta(evrenModelApiUrl, testCase));
+          const runPromises = Array.from({ length: runCount }, async () => callEvrenApiWithMeta(evrenModelApiUrl, testCase, body.evren_flash_model));
           const runResults = await Promise.allSettled(runPromises);
           const runs: RunEntry[] = [];
 
@@ -270,14 +275,21 @@ export async function POST(
             runs.push({
               run_id: crypto.randomUUID(),
               run_index: runIndex + 1,
+              request_duration_seconds: settled.value.requestDurationSeconds,
+              code_source: settled.value.codeSource?.text ?? null,
+              eval_user_id: settled.value.evalUserId ?? null,
               turns: runOutputs.map((o) => ({
                 response: Array.isArray(o.evren_response) ? o.evren_response.map(String) : [String(o.evren_response ?? "")],
                 detected_flags: String(o.detected_states ?? ""),
                 route_trace: o.route_trace ?? null,
+                metrics: o.metrics ?? null,
               })),
             });
           }
 
+          if (runs.length !== runCount) {
+            throw new Error(`Evren completed ${runs.length}/${runCount} runs. Check backend errors before comparing models.`);
+          }
           if (runs.length > 0) {
             const existing = Array.isArray(row.evren_responses) ? (row.evren_responses as VersionEntry[]) : [];
             const newVersion: VersionEntry = {

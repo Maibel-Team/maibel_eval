@@ -1,3 +1,4 @@
+import type { EvrenMetrics } from "./types";
 /**
  * Supabase DB types for Maibel Eval.
  *
@@ -111,6 +112,7 @@ export interface RouteTrace {
 export interface VersionTurn {
   response: string[];
   detected_flags: string;
+  metrics?: EvrenMetrics | null;
   route_trace?: RouteTrace | null;
 }
 
@@ -120,6 +122,9 @@ export interface RunEntry {
   run_id: string;
   run_index: number;
   turns: VersionTurn[];
+  request_duration_seconds?: number;
+  code_source?: string | null;
+  eval_user_id?: string | null;
 }
 
 /** One version stored in eval_results.evren_responses. */
@@ -162,6 +167,9 @@ export function normalizeVersionEntry(version: AnyVersionEntry): VersionEntry {
             ? Math.floor(run.run_index)
             : idx + 1,
         turns: Array.isArray(run.turns) ? run.turns : [],
+        request_duration_seconds: run.request_duration_seconds,
+        code_source: run.code_source,
+        eval_user_id: run.eval_user_id,
       })),
     };
   }

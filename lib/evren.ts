@@ -126,8 +126,9 @@ export async function fetchEvrenCodeSource(evrenModelApiUrl: string): Promise<st
  */
 export async function callEvrenApiWithMeta(
   evrenModelApiUrl: string,
-  testCase: TestCase
-): Promise<{ outputs: EvrenOutput[]; codeSource: EvrenCodeSource | null }> {
+  testCase: TestCase,
+  flashModel?: string
+): Promise<{ outputs: EvrenOutput[]; codeSource: EvrenCodeSource | null; requestDurationSeconds?: number; evalUserId?: string | null }> {
   const messages: string[] =
     testCase.type === "multi_turn" && Array.isArray(testCase.turns) && testCase.turns.length > 0
       ? testCase.turns.map((s) => String(s ?? "").trim()).filter(Boolean)
@@ -154,6 +155,7 @@ export async function callEvrenApiWithMeta(
       .join("\n");
   }
 
+  if (flashModel) body.flash_model = flashModel;
   const url = evrenEndpoint(evrenModelApiUrl);
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   applyEvrenAuthHeaders(headers);
@@ -166,6 +168,7 @@ export async function callEvrenApiWithMeta(
     messageCount: messages.length,
     evrenAuth: { xApiKey: hasKey ? "set" : "missing", authorization: hasAuthz ? "set" : "missing" },
   });
+  const started = performance.now();
   let res: Response;
   try {
     res = await fetch(url, {
@@ -198,21 +201,31 @@ export async function callEvrenApiWithMeta(
     response?: string | string[];
     detected_flags?: string;
     route_trace?: RouteTrace | null;
+    metrics?: EvrenOutput["metrics"];
   }> | undefined;
   const codeSource = parseEvrenCodeSourceFromResponse(data);
 
   console.log("[Evren API] raw response:", JSON.stringify(data, null, 2));
 
   if (!Array.isArray(evrenResponses)) {
+    if (flashModel) throw new Error("Evren returned no conversation. Check the eval backend.");
     return { outputs: [{ evren_response: "", detected_states: "" }], codeSource };
   }
 
+  if (flashModel && evrenResponses.length !== messages.length) {
+    throw new Error("Evren returned incomplete turns. Do not score this run.");
+  }
+  if (flashModel && evrenResponses.some((item) => item.metrics?.flash_model !== flashModel)) {
+    throw new Error("Evren backend did not confirm the requested model and metrics. Check the eval deployment before running.");
+  }
   const outputs = evrenResponses.map((item) => ({
     evren_response: item?.response ?? "",
     detected_states: String(item?.detected_flags ?? ""),
     route_trace: item?.route_trace ?? null,
+    metrics: item?.metrics ?? null,
   }));
-  return { outputs, codeSource };
+  return { outputs, codeSource, requestDurationSeconds: (performance.now() - started) / 1000,
+    evalUserId: typeof data.eval_user_id === "string" ? data.eval_user_id : null };
 }
 
 /**

@@ -1,3 +1,4 @@
+import { isEvrenFlashModel } from "@/lib/evren-models";
 import { createClient } from "@/lib/supabase/server";
 import { getMaxConcurrentTestCases, runWithConcurrency } from "@/lib/evren-concurrency";
 import { callEvrenApiWithMeta } from "@/lib/evren";
@@ -60,6 +61,7 @@ export async function POST(request: Request) {
     evren_model_api_url: string;
     mode?: "single" | "comparison";
     run_count?: number;
+    evren_flash_model?: string;
     model_name?: string;
     summarizer_model?: string;
     system_prompt?: string;
@@ -81,6 +83,9 @@ export async function POST(request: Request) {
   }
 
   const sessionMode: "comparison" = "comparison";
+  if (body.evren_flash_model !== undefined && !isEvrenFlashModel(body.evren_flash_model)) {
+    return Response.json({ error: "Unsupported Evren Flash model" }, { status: 400 });
+  }
   const runCount = Number.isFinite(body.run_count) ? Math.max(1, Math.floor(body.run_count as number)) : 1;
   const useEvaluator = false;
   const useSummarizer = false;
@@ -214,7 +219,7 @@ export async function POST(request: Request) {
         await runWithConcurrency(rows, maxConcurrentTestCases, async (row, index) => {
           const testCase: TestCase = testCaseFromRow(row);
 
-          const runPromises = Array.from({ length: runCount }, async () => callEvrenApiWithMeta(evrenModelApiUrl, testCase));
+          const runPromises = Array.from({ length: runCount }, async () => callEvrenApiWithMeta(evrenModelApiUrl, testCase, body.evren_flash_model));
           const runResults = await Promise.allSettled(runPromises);
           const runs: RunEntry[] = [];
 
@@ -241,12 +246,19 @@ export async function POST(request: Request) {
             runs.push({
               run_id: crypto.randomUUID(),
               run_index: runIndex + 1,
+              request_duration_seconds: settled.value.requestDurationSeconds,
+              code_source: settled.value.codeSource?.text ?? null,
+              eval_user_id: settled.value.evalUserId ?? null,
               turns: runOutputs.map((o) => ({
                 response: Array.isArray(o.evren_response) ? o.evren_response.map(String) : [String(o.evren_response ?? "")],
                 detected_flags: String(o.detected_states ?? ""),
                 route_trace: o.route_trace ?? null,
+                metrics: o.metrics ?? null,
               })),
             });
+          }
+          if (runs.length !== runCount) {
+            throw new Error(`Evren completed ${runs.length}/${runCount} runs. Check backend errors before comparing models.`);
           }
           if (runs.length === 0) {
             completedCount++;

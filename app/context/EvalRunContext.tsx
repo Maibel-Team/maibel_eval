@@ -76,6 +76,7 @@ type EvalRunContextValue = {
   runState: EvalRunState;
   startRun: (params: {
     evren_model_api_url: string;
+    evren_flash_model?: string;
     mode: "single" | "comparison";
     run_count: number;
     model_name?: string;
@@ -103,6 +104,7 @@ export function EvalRunProvider({ children }: { children: ReactNode }) {
   const startRun = useCallback(
     async (params: {
       evren_model_api_url: string;
+      evren_flash_model?: string;
       mode: "single" | "comparison";
       run_count: number;
       model_name?: string;
@@ -122,6 +124,7 @@ export function EvalRunProvider({ children }: { children: ReactNode }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             evren_model_api_url: params.evren_model_api_url.trim(),
+            evren_flash_model: params.evren_flash_model,
             mode: params.mode,
             run_count: params.run_count,
             model_name: params.model_name || undefined,

@@ -36,11 +36,29 @@ export interface RouteTrace {
   confidence?: number | null;
 }
 
+export interface EvrenMetrics {
+  flash_model: string;
+  scope: string;
+  duration_seconds: number;
+  llm_call_seconds: number;
+  call_count: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  reasoning_tokens: number;
+  billable_output_tokens: number;
+  usage_complete: boolean;
+  estimated_cost_usd: number | null;
+  pricing_date: string;
+  calls: Array<Record<string, unknown>>;
+}
+
 /** Evren model output for one test case. */
 export interface EvrenOutput {
   /** Single string or array of strings (one per bubble). */
   evren_response: string | string[];
   detected_states: string;
+  metrics?: EvrenMetrics | null;
   route_trace?: RouteTrace | null;
 }
 
