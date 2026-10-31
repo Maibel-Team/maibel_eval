@@ -1,4 +1,6 @@
 "use client";
+import { EvrenModelSelect } from "@/app/components/EvrenModelSelect";
+import { EvrenTurnMetrics } from "@/app/components/EvrenTurnMetrics";
 
 import Link from "next/link";
 import { Pencil, RefreshCw, Save, X, Trash2, Check, Plus, Eye, EyeOff, Eraser, GitCommitHorizontal } from "lucide-react";
@@ -672,6 +674,7 @@ export default function SessionDetailPage() {
   const [draftVersions, setDraftVersions] = useState<{ version_id: string; version_name: string }[]>([]);
   const [newVersionLabel, setNewVersionLabel] = useState("Version 2");
   const [runComparison, setRunComparison] = useState(true);
+  const [evrenFlashModel, setEvrenFlashModel] = useState("gemini-2.5-flash");
   const [addVersionRunCount, setAddVersionRunCount] = useState(1);
   const [editingVersionId, setEditingVersionId] = useState<string | null>(null);
   const [deletingVersionId, setDeletingVersionId] = useState<string | null>(null);
@@ -1256,6 +1259,7 @@ export default function SessionDetailPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           version_name: cleanedNewVersionLabel,
+          evren_flash_model: evrenFlashModel,
           run_count: effectiveRunCount,
           run_comparison: runComparison,
         }),
@@ -2814,6 +2818,7 @@ export default function SessionDetailPage() {
                   className="mt-1 block w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 focus:border-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-400"
                 />
               </div>
+              <EvrenModelSelect value={evrenFlashModel} onChange={setEvrenFlashModel} disabled={addingVersion} />
               <div className="flex items-center justify-between pt-1">
                 <div>
                   <p className="text-sm font-medium text-stone-700">Run comparison</p>
@@ -3271,6 +3276,7 @@ export default function SessionDetailPage() {
                                           <p className="text-[11px] font-medium uppercase tracking-wide text-stone-400">
                                             Run {run.run_index}
                                           </p>
+                                          <EvrenTurnMetrics metrics={turnData?.metrics} />
                                           <div className="mt-1 space-y-2">
                                             {bubbles.length > 0 ? (
                                               bubbles.map((bubble, j) => (
@@ -3319,6 +3325,7 @@ export default function SessionDetailPage() {
                                                   <p className="text-[11px] font-medium uppercase tracking-wide text-stone-400">
                                                     Run {run.run_index}
                                                   </p>
+                                                  <EvrenTurnMetrics metrics={turnData?.metrics} />
                                                   <div className="mt-1 space-y-2">
                                                     {bubbles.length > 0 ? (
                                                       bubbles.map((bubble, bubbleIdx) => (

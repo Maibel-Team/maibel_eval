@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { EvrenModelSelect } from "@/app/components/EvrenModelSelect";
 import { PageHeader } from "@/app/components/PageHeader";
 import { useEvalRun } from "@/app/context/EvalRunContext";
 import { DEFAULT_EVAL_LLM_MODEL } from "@/lib/eval-llm-defaults";
@@ -23,6 +24,7 @@ export default function Home() {
   const { runState, startRun, cancelRun, clearRunState } = useEvalRun();
   const [evrenUrl, setEvrenUrl] = useState(FALLBACK_EVREN_URL);
   const mode: SessionMode = "comparison";
+  const [evrenFlashModel, setEvrenFlashModel] = useState("gemini-2.5-flash");
   const [runCount, setRunCount] = useState(1);
   const [evaluatorModel, setEvaluatorModel] = useState(FALLBACK_EVALUATOR_MODEL);
   const [summarizerModel, setSummarizerModel] = useState(FALLBACK_SUMMARIZER_MODEL);
@@ -52,6 +54,7 @@ export default function Home() {
     requestNotificationPermission();
     startRun({
       evren_model_api_url: evrenUrl.trim(),
+      evren_flash_model: evrenFlashModel,
       mode,
       run_count: Math.max(1, Math.floor(runCount || 1)),
       model_name: undefined,
@@ -80,6 +83,7 @@ export default function Home() {
         <div className="mt-5 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-700">
           Mode: <span className="font-medium text-stone-900">Version Comparison</span> (single mode is disabled)
         </div>
+        <EvrenModelSelect value={evrenFlashModel} onChange={setEvrenFlashModel} disabled={loading} />
         <div className="mt-4">
           <label className="block text-sm font-medium text-stone-700">Runs per case</label>
           <input
