@@ -127,7 +127,8 @@ export async function fetchEvrenCodeSource(evrenModelApiUrl: string): Promise<st
 export async function callEvrenApiWithMeta(
   evrenModelApiUrl: string,
   testCase: TestCase,
-  flashModel?: string
+  flashModel?: string,
+  routeControls?: { disable_p0: boolean; disable_p1: boolean }
 ): Promise<{ outputs: EvrenOutput[]; codeSource: EvrenCodeSource | null; requestDurationSeconds?: number; evalUserId?: string | null }> {
   const messages: string[] =
     testCase.type === "multi_turn" && Array.isArray(testCase.turns) && testCase.turns.length > 0
@@ -156,6 +157,9 @@ export async function callEvrenApiWithMeta(
   }
 
   if (flashModel) body.flash_model = flashModel;
+  // Test-case extras must not override the selected run configuration.
+  body.disable_p0 = routeControls?.disable_p0 ?? false;
+  body.disable_p1 = routeControls?.disable_p1 ?? false;
   const url = evrenEndpoint(evrenModelApiUrl);
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   applyEvrenAuthHeaders(headers);
@@ -217,6 +221,13 @@ export async function callEvrenApiWithMeta(
   }
   if (flashModel && evrenResponses.some((item) => item.metrics?.flash_model !== flashModel)) {
     throw new Error("Evren backend did not confirm the requested model and metrics. Check the eval deployment before running.");
+  }
+  if (routeControls && evrenResponses.some((item) =>
+    item.metrics?.route_controls_version !== 1 ||
+    item.metrics?.disable_p0 !== routeControls.disable_p0 ||
+    item.metrics?.disable_p1 !== routeControls.disable_p1
+  )) {
+    throw new Error("Evren backend did not confirm the requested P0/P1 configuration. Check the eval deployment before running.");
   }
   const outputs = evrenResponses.map((item) => ({
     evren_response: item?.response ?? "",

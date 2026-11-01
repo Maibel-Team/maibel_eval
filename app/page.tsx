@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { EvrenRouteToggles } from "@/app/components/EvrenRouteToggles";
 import { EvrenModelSelect } from "@/app/components/EvrenModelSelect";
 import { PageHeader } from "@/app/components/PageHeader";
 import { useEvalRun } from "@/app/context/EvalRunContext";
@@ -25,6 +26,8 @@ export default function Home() {
   const [evrenUrl, setEvrenUrl] = useState(FALLBACK_EVREN_URL);
   const mode: SessionMode = "comparison";
   const [evrenFlashModel, setEvrenFlashModel] = useState("gemini-2.5-flash");
+  const [disableP0, setDisableP0] = useState(false);
+  const [disableP1, setDisableP1] = useState(false);
   const [runCount, setRunCount] = useState(1);
   const [evaluatorModel, setEvaluatorModel] = useState(FALLBACK_EVALUATOR_MODEL);
   const [summarizerModel, setSummarizerModel] = useState(FALLBACK_SUMMARIZER_MODEL);
@@ -55,6 +58,8 @@ export default function Home() {
     startRun({
       evren_model_api_url: evrenUrl.trim(),
       evren_flash_model: evrenFlashModel,
+      disable_p0: disableP0,
+      disable_p1: disableP1,
       mode,
       run_count: Math.max(1, Math.floor(runCount || 1)),
       model_name: undefined,
@@ -84,6 +89,7 @@ export default function Home() {
           Mode: <span className="font-medium text-stone-900">Version Comparison</span> (single mode is disabled)
         </div>
         <EvrenModelSelect value={evrenFlashModel} onChange={setEvrenFlashModel} disabled={loading} />
+        <EvrenRouteToggles disableP0={disableP0} disableP1={disableP1} onP0Change={setDisableP0} onP1Change={setDisableP1} disabled={loading} />
         <div className="mt-4">
           <label className="block text-sm font-medium text-stone-700">Runs per case</label>
           <input

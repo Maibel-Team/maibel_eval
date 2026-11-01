@@ -36,7 +36,16 @@ export interface RouteTrace {
   confidence?: number | null;
 }
 
+export interface EvrenEvalConfig {
+  flash_model: string;
+  disable_p0: boolean;
+  disable_p1: boolean;
+}
+
 export interface EvrenMetrics {
+  disable_p0?: boolean;
+  disable_p1?: boolean;
+  route_controls_version?: number;
   flash_model: string;
   scope: string;
   duration_seconds: number;

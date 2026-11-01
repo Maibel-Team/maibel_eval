@@ -1,4 +1,5 @@
 "use client";
+import { EvrenRouteToggles } from "@/app/components/EvrenRouteToggles";
 import { EvrenModelSelect } from "@/app/components/EvrenModelSelect";
 import { EvrenTurnMetrics } from "@/app/components/EvrenTurnMetrics";
 
@@ -675,6 +676,8 @@ export default function SessionDetailPage() {
   const [newVersionLabel, setNewVersionLabel] = useState("Version 2");
   const [runComparison, setRunComparison] = useState(true);
   const [evrenFlashModel, setEvrenFlashModel] = useState("gemini-2.5-flash");
+  const [disableP0, setDisableP0] = useState(false);
+  const [disableP1, setDisableP1] = useState(false);
   const [addVersionRunCount, setAddVersionRunCount] = useState(1);
   const [editingVersionId, setEditingVersionId] = useState<string | null>(null);
   const [deletingVersionId, setDeletingVersionId] = useState<string | null>(null);
@@ -1260,6 +1263,8 @@ export default function SessionDetailPage() {
         body: JSON.stringify({
           version_name: cleanedNewVersionLabel,
           evren_flash_model: evrenFlashModel,
+          disable_p0: disableP0,
+          disable_p1: disableP1,
           run_count: effectiveRunCount,
           run_comparison: runComparison,
         }),
@@ -2819,6 +2824,7 @@ export default function SessionDetailPage() {
                 />
               </div>
               <EvrenModelSelect value={evrenFlashModel} onChange={setEvrenFlashModel} disabled={addingVersion} />
+              <EvrenRouteToggles disableP0={disableP0} disableP1={disableP1} onP0Change={setDisableP0} onP1Change={setDisableP1} disabled={addingVersion} />
               <div className="flex items-center justify-between pt-1">
                 <div>
                   <p className="text-sm font-medium text-stone-700">Run comparison</p>
@@ -3194,7 +3200,7 @@ export default function SessionDetailPage() {
                         const turnCount = getTurnCount(versions);
                         const runsExpanded = expandedRunsKeys.has(r.eval_result_id);
                         const totalRunCount = Math.max(0, ...versions.map((v) => v.runs.length));
-                        const versionMeta = versions.map((v) => `${v.version_name}: ${v.run_count_requested} run${v.run_count_requested === 1 ? "" : "s"} (${v.evidence_source})`).join(" · ");
+                        const versionMeta = versions.map((v) => `${v.version_name}: ${v.run_count_requested} run${v.run_count_requested === 1 ? "" : "s"} (${v.evidence_source})${v.eval_config ? ` · ${v.eval_config.flash_model} · P0 ${v.eval_config.disable_p0 ? "disabled" : "enabled"} / P1 ${v.eval_config.disable_p1 ? "disabled" : "enabled"}` : ""}`).join(" · ");
                         if (turnCount === 0 && versions.length === 0) {
                           return (
                             <div className="space-y-2">
