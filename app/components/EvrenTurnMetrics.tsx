@@ -4,6 +4,7 @@ export function EvrenTurnMetrics({ metrics }: { metrics?: EvrenMetrics | null })
   if (!metrics) return null;
   return <details className="mt-2 text-xs text-stone-600">
     <summary className="cursor-pointer">{metrics.flash_model} · {metrics.duration_seconds.toFixed(2)}s · {metrics.total_tokens.toLocaleString()} tokens{!metrics.usage_complete ? " (partial)" : ""} · {metrics.estimated_cost_usd == null ? "cost unavailable" : `~$${metrics.estimated_cost_usd.toFixed(5)}`}</summary>
+    {metrics.route_controls_version === 1 && <p className="mt-1 font-medium">P0: {metrics.disable_p0 ? "disabled" : "enabled"} · P1: {metrics.disable_p1 ? "disabled" : "enabled"}</p>}
     <p className="mt-1">Input: {metrics.prompt_tokens.toLocaleString()} · Visible output: {metrics.completion_tokens.toLocaleString()} · Thinking: {metrics.reasoning_tokens.toLocaleString()} · Model calls: {metrics.call_count}</p>
     <p>Response time includes Evren processing. Summed model-call time: {metrics.llm_call_seconds.toFixed(2)}s (calls may overlap).</p>
     <p>Estimated generation cost, excluding embeddings and evaluation. Rates dated {metrics.pricing_date}; Flash 3.8 introductory rates end December 31, 2026.</p>

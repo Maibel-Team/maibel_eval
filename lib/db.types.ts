@@ -129,6 +129,7 @@ export interface RunEntry {
 
 /** One version stored in eval_results.evren_responses. */
 export interface VersionEntry {
+  eval_config?: import("./types").EvrenEvalConfig;
   version_id: string;
   version_name: string;
   run_count_requested: number;
@@ -149,6 +150,7 @@ export type AnyVersionEntry = VersionEntry | LegacyVersionEntry;
 export function normalizeVersionEntry(version: AnyVersionEntry): VersionEntry {
   if ("runs" in version && Array.isArray(version.runs)) {
     return {
+      eval_config: version.eval_config,
       version_id: version.version_id,
       version_name: version.version_name,
       run_count_requested:

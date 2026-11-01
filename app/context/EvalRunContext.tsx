@@ -77,6 +77,8 @@ type EvalRunContextValue = {
   startRun: (params: {
     evren_model_api_url: string;
     evren_flash_model?: string;
+    disable_p0?: boolean;
+    disable_p1?: boolean;
     mode: "single" | "comparison";
     run_count: number;
     model_name?: string;
@@ -105,6 +107,8 @@ export function EvalRunProvider({ children }: { children: ReactNode }) {
     async (params: {
       evren_model_api_url: string;
       evren_flash_model?: string;
+      disable_p0?: boolean;
+      disable_p1?: boolean;
       mode: "single" | "comparison";
       run_count: number;
       model_name?: string;
@@ -125,6 +129,8 @@ export function EvalRunProvider({ children }: { children: ReactNode }) {
           body: JSON.stringify({
             evren_model_api_url: params.evren_model_api_url.trim(),
             evren_flash_model: params.evren_flash_model,
+            disable_p0: params.disable_p0 ?? false,
+            disable_p1: params.disable_p1 ?? false,
             mode: params.mode,
             run_count: params.run_count,
             model_name: params.model_name || undefined,
