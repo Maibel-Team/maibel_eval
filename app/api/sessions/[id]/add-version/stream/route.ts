@@ -294,7 +294,10 @@ export async function POST(
           }
 
           if (runs.length !== runCount) {
-            throw new Error(`Evren completed ${runs.length}/${runCount} runs. Check backend errors before comparing models.`);
+            const errors = runResults.flatMap((result, index) => result.status === "rejected"
+              ? [`Run ${index + 1}: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`]
+              : []);
+            throw new Error(`Evren completed ${runs.length}/${runCount} runs. ${errors.join("; ")}`);
           }
           if (runs.length > 0) {
             const existing = Array.isArray(row.evren_responses) ? (row.evren_responses as VersionEntry[]) : [];

@@ -674,7 +674,7 @@ export default function SessionDetailPage() {
   const [showAddVersionModal, setShowAddVersionModal] = useState(false);
   const [draftVersions, setDraftVersions] = useState<{ version_id: string; version_name: string }[]>([]);
   const [newVersionLabel, setNewVersionLabel] = useState("Version 2");
-  const [runComparison, setRunComparison] = useState(true);
+  const [runComparison, setRunComparison] = useState(false);
   const [evrenFlashModel, setEvrenFlashModel] = useState("gemini-2.5-flash");
   const [disableP0, setDisableP0] = useState(false);
   const [disableP1, setDisableP1] = useState(false);
@@ -1206,6 +1206,7 @@ export default function SessionDetailPage() {
   }
 
   function addVersion() {
+    setRunComparison(false);
     const drafts = versionEntries.map((v) => ({ version_id: v.version_id, version_name: v.version_name }));
     setDraftVersions(drafts);
     const existingLower = new Set(drafts.map((d) => d.version_name.toLowerCase()));
