@@ -38,14 +38,20 @@ export interface RouteTrace {
 
 export interface EvrenEvalConfig {
   flash_model: string;
-  disable_p0: boolean;
-  disable_p1: boolean;
+  /** New runs use the backend policy; legacy runs retain their requested switches. */
+  route_policy?: "server";
+  disable_p0?: boolean;
+  disable_p1?: boolean;
 }
 
 export interface EvrenMetrics {
   disable_p0?: boolean;
   disable_p1?: boolean;
   route_controls_version?: number;
+  requested_disable_p0?: boolean;
+  requested_disable_p1?: boolean;
+  global_p0_enabled?: boolean;
+  global_p1_enabled?: boolean;
   flash_model: string;
   scope: string;
   duration_seconds: number;
