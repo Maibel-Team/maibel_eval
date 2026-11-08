@@ -1,5 +1,4 @@
 "use client";
-import { EvrenRouteToggles } from "@/app/components/EvrenRouteToggles";
 import { EvrenModelSelect } from "@/app/components/EvrenModelSelect";
 import { EvrenTurnMetrics } from "@/app/components/EvrenTurnMetrics";
 
@@ -11,6 +10,8 @@ import ReactMarkdown from "react-markdown";
 import { SummaryEditor } from "@/app/components/SummaryEditor";
 import { DEFAULT_EVAL_LLM_MODEL } from "@/lib/eval-llm-defaults";
 import { computeTokenCostParts } from "@/lib/token-cost";
+import { formatDisabledDetectionNote, formatVersionRoutePolicy } from "@/lib/evren-route-policy";
+import type { EvrenMetrics } from "@/lib/types";
 import {
   BEHAVIOR_REVIEW_DIMENSIONS,
   emptyVersionBehaviorReview,
@@ -553,7 +554,7 @@ const editTriggerClassName =
 
 function prettyDetectedFlags(value: string): string {
   const raw = String(value ?? "").trim();
-  if (!raw) return "—";
+  if (!raw) return "Not reported";
   try {
     const parsed = JSON.parse(raw) as unknown;
     return JSON.stringify(parsed, null, 2);
@@ -562,39 +563,35 @@ function prettyDetectedFlags(value: string): string {
   }
 }
 
+function DisabledDetectionNote({ metrics }: { metrics?: EvrenMetrics | null }) {
+  const note = formatDisabledDetectionNote(metrics);
+  return note ? <p className="mt-1 text-xs text-stone-600">{note}</p> : null;
+}
+
 function prettyRouteTrace(value: RouteTrace | null | undefined): string {
-  if (!value) return "—";
+  if (!value || Object.keys(value).length === 0) return "Not reported";
   const hasNewShape =
     "primary_agent" in value || "agents_considered" in value || "response_path" in value;
   if (!hasNewShape) {
     return JSON.stringify(value, null, 2);
   }
   const fmt = (v: unknown): string => {
-    if (v == null) return "null";
+    if (v == null) return "Not reported";
     if (Array.isArray(v)) return v.length ? v.join(", ") : "[]";
+    if (typeof v === "object") return JSON.stringify(v);
     return String(v);
   };
+  const displayedKeys = new Set(["primary_agent", "agents_considered", "intent", "active_gates", "response_path"]);
   return [
-    `- primary_agent = ${fmt(value.primary_agent ?? null)}`,
-    `- agents_considered = ${fmt(value.agents_considered ?? [])}`,
-    `- intent = ${fmt(value.intent ?? [])}`,
-    `- active_gates = ${fmt(value.active_gates ?? [])}`,
-    `- response_path = ${fmt(value.response_path ?? null)}`,
+    `- primary_agent = ${fmt(value.primary_agent)}`,
+    `- agents_considered = ${fmt(value.agents_considered)}`,
+    `- intent = ${fmt(value.intent)}`,
+    `- active_gates = ${fmt(value.active_gates)}`,
+    `- response_path = ${fmt(value.response_path)}`,
+    ...Object.entries(value)
+      .filter(([key]) => !displayedKeys.has(key))
+      .map(([key, detail]) => `- ${key} = ${fmt(detail)}`),
   ].join("\n");
-}
-
-function turnHasRouteTrace(routeTrace: RouteTrace | null | undefined): boolean {
-  if (!routeTrace) return false;
-  return (
-    (routeTrace.primary_agent != null && routeTrace.primary_agent !== "") ||
-    (routeTrace.agents_considered?.length ?? 0) > 0 ||
-    (routeTrace.active_gates?.length ?? 0) > 0 ||
-    (routeTrace.intent?.length ?? 0) > 0 ||
-    (routeTrace.response_path != null && routeTrace.response_path !== "") ||
-    (routeTrace.selected_route?.length ?? 0) > 0 ||
-    (routeTrace.candidate_routes?.length ?? 0) > 0 ||
-    routeTrace.confidence != null
-  );
 }
 
 function getBehaviorReviewDraft(
@@ -676,8 +673,6 @@ export default function SessionDetailPage() {
   const [newVersionLabel, setNewVersionLabel] = useState("Version 2");
   const [runComparison, setRunComparison] = useState(false);
   const [evrenFlashModel, setEvrenFlashModel] = useState("gemini-2.5-flash");
-  const [disableP0, setDisableP0] = useState(false);
-  const [disableP1, setDisableP1] = useState(false);
   const [addVersionRunCount, setAddVersionRunCount] = useState(1);
   const [editingVersionId, setEditingVersionId] = useState<string | null>(null);
   const [deletingVersionId, setDeletingVersionId] = useState<string | null>(null);
@@ -1264,8 +1259,6 @@ export default function SessionDetailPage() {
         body: JSON.stringify({
           version_name: cleanedNewVersionLabel,
           evren_flash_model: evrenFlashModel,
-          disable_p0: disableP0,
-          disable_p1: disableP1,
           run_count: effectiveRunCount,
           run_comparison: runComparison,
         }),
@@ -2825,7 +2818,7 @@ export default function SessionDetailPage() {
                 />
               </div>
               <EvrenModelSelect value={evrenFlashModel} onChange={setEvrenFlashModel} disabled={addingVersion} />
-              <EvrenRouteToggles disableP0={disableP0} disableP1={disableP1} onP0Change={setDisableP0} onP1Change={setDisableP1} disabled={addingVersion} />
+              <p className="text-xs text-stone-600">Routing is controlled by the Evren backend. Actual settings are saved with each run.</p>
               <div className="flex items-center justify-between pt-1">
                 <div>
                   <p className="text-sm font-medium text-stone-700">Run comparison</p>
@@ -3201,7 +3194,7 @@ export default function SessionDetailPage() {
                         const turnCount = getTurnCount(versions);
                         const runsExpanded = expandedRunsKeys.has(r.eval_result_id);
                         const totalRunCount = Math.max(0, ...versions.map((v) => v.runs.length));
-                        const versionMeta = versions.map((v) => `${v.version_name}: ${v.run_count_requested} run${v.run_count_requested === 1 ? "" : "s"} (${v.evidence_source})${v.eval_config ? ` · ${v.eval_config.flash_model} · P0 ${v.eval_config.disable_p0 ? "disabled" : "enabled"} / P1 ${v.eval_config.disable_p1 ? "disabled" : "enabled"}` : ""}`).join(" · ");
+                        const versionMeta = versions.map((v) => `${v.version_name}: ${v.run_count_requested} run${v.run_count_requested === 1 ? "" : "s"} (${v.evidence_source})${v.eval_config ? ` · ${v.eval_config.flash_model}` : ""} · ${formatVersionRoutePolicy(v)}`).join(" · ");
                         if (turnCount === 0 && versions.length === 0) {
                           return (
                             <div className="space-y-2">
@@ -3249,12 +3242,16 @@ export default function SessionDetailPage() {
                           const flagsKey = `${r.eval_result_id}-${i}`;
                           const flagsExpanded = expandedFlagsKeys.has(flagsKey);
                           const routeTraceExpanded = expandedRouteTraceKeys.has(flagsKey);
-                          const hasFlags = versions.some((v) =>
-                            v.runs.some((run) => run.turns[i]?.detected_flags?.trim())
+                          const versionsWithTurn = versions.filter((v) =>
+                            v.runs.some((run) => run.turns[i] != null)
                           );
-                          const hasRouteTrace = versions.some((v) =>
-                            v.runs.some((run) => turnHasRouteTrace(run.turns[i]?.route_trace))
-                          );
+                          const hasEvaluatedTurn = versionsWithTurn.length > 0;
+                          const evidenceRunsForTurn = (version: VersionEntry) => {
+                            const runs = version.runs.filter((run) => run.turns[i] != null);
+                            if (runsExpanded) return runs;
+                            const firstRun = runs.filter((run) => run.run_index === 1);
+                            return firstRun.length > 0 ? firstRun : runs.slice(0, 1);
+                          };
                           const singleVersion = versions.length <= 1;
                           const singleRuns = versions[0]?.runs ?? [];
                           const singleRunsCollapsed = singleRuns.filter((run) => run.run_index === 1);
@@ -3359,7 +3356,7 @@ export default function SessionDetailPage() {
                                     })}
                                   </div>
                                 )}
-                                {hasFlags && (
+                                {hasEvaluatedTurn && (
                                   <div className="mt-2">
                                     <button
                                       type="button"
@@ -3381,7 +3378,7 @@ export default function SessionDetailPage() {
                                       <div className="mt-2">
                                         {singleVersion ? (
                                           <div className="space-y-2">
-                                            {displaySingleRuns.map((run) => (
+                                            {evidenceRunsForTurn(versions[0]).map((run) => (
                                               <div key={run.run_id} className="rounded-lg border border-stone-200 bg-white px-3 py-2">
                                                 <p className="text-[11px] font-medium uppercase tracking-wide text-stone-400">
                                                   Run {run.run_index}
@@ -3389,12 +3386,13 @@ export default function SessionDetailPage() {
                                                 <pre className="mt-1 whitespace-pre-wrap break-words text-xs text-stone-700 font-mono">
                                                   {prettyDetectedFlags(run.turns[i]?.detected_flags ?? "")}
                                                 </pre>
+                                                <DisabledDetectionNote metrics={run.turns[i]?.metrics} />
                                               </div>
                                             ))}
                                           </div>
                                         ) : (
                                           <div className="mt-1 flex gap-2 overflow-x-auto pb-1">
-                                            {versions.map((ver) => (
+                                            {versionsWithTurn.map((ver) => (
                                               <div
                                                 key={ver.version_id}
                                                 className="flex-1 min-w-[260px] rounded-lg border border-stone-200 bg-white px-3 py-2"
@@ -3404,11 +3402,7 @@ export default function SessionDetailPage() {
                                                 </p>
                                                 <div className="mt-1 space-y-2">
                                                   {(() => {
-                                                    const collapsedRuns = ver.runs.filter((run) => run.run_index === 1);
-                                                    const displayRuns = runsExpanded
-                                                      ? ver.runs
-                                                      : (collapsedRuns.length > 0 ? collapsedRuns : ver.runs.slice(0, 1));
-                                                    return displayRuns.map((run) => (
+                                                    return evidenceRunsForTurn(ver).map((run) => (
                                                       <div key={run.run_id}>
                                                         <p className="text-[11px] font-medium uppercase tracking-wide text-stone-400">
                                                           Run {run.run_index}
@@ -3416,6 +3410,7 @@ export default function SessionDetailPage() {
                                                         <pre className="mt-1 whitespace-pre-wrap break-words text-xs text-stone-700 font-mono">
                                                           {prettyDetectedFlags(run.turns[i]?.detected_flags ?? "")}
                                                         </pre>
+                                                        <DisabledDetectionNote metrics={run.turns[i]?.metrics} />
                                                       </div>
                                                     ));
                                                   })()}
@@ -3428,7 +3423,7 @@ export default function SessionDetailPage() {
                                     )}
                                   </div>
                                 )}
-                                {hasRouteTrace && (
+                                {hasEvaluatedTurn && (
                                   <div className="mt-2">
                                     <button
                                       type="button"
@@ -3450,7 +3445,7 @@ export default function SessionDetailPage() {
                                       <div className="mt-2">
                                         {singleVersion ? (
                                           <div className="space-y-2">
-                                            {displaySingleRuns.map((run) => (
+                                            {evidenceRunsForTurn(versions[0]).map((run) => (
                                               <div key={run.run_id} className="rounded-lg border border-stone-200 bg-white px-3 py-2">
                                                 <p className="text-[11px] font-medium uppercase tracking-wide text-stone-400">
                                                   Run {run.run_index}
@@ -3463,7 +3458,7 @@ export default function SessionDetailPage() {
                                           </div>
                                         ) : (
                                           <div className="mt-1 flex gap-2 overflow-x-auto pb-1">
-                                            {versions.map((ver) => (
+                                            {versionsWithTurn.map((ver) => (
                                               <div
                                                 key={ver.version_id}
                                                 className="flex-1 min-w-[260px] rounded-lg border border-stone-200 bg-white px-3 py-2"
@@ -3473,11 +3468,7 @@ export default function SessionDetailPage() {
                                                 </p>
                                                 <div className="mt-1 space-y-2">
                                                   {(() => {
-                                                    const collapsedRuns = ver.runs.filter((run) => run.run_index === 1);
-                                                    const displayRuns = runsExpanded
-                                                      ? ver.runs
-                                                      : (collapsedRuns.length > 0 ? collapsedRuns : ver.runs.slice(0, 1));
-                                                    return displayRuns.map((run) => (
+                                                    return evidenceRunsForTurn(ver).map((run) => (
                                                       <div key={run.run_id}>
                                                         <p className="text-[11px] font-medium uppercase tracking-wide text-stone-400">
                                                           Run {run.run_index}

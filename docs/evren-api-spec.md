@@ -29,6 +29,19 @@ Processes a list of user messages (one turn or a full conversation) and returns 
 | `messages` | string[] | **Yes**  | Ordered list of user messages. Single-turn = 1 element; multi-turn = 2+ elements (conversation in order). |
 | `context`  | object or string | No | Optional. Pre-conversation context (e.g. memory). If the eval app has JSON context, it sends an object; otherwise `{ "description": "<string>" }`. |
 
+### Routing settings
+
+New evaluation runs use the backend's routing policy. The site does not send `disable_p0` or `disable_p1`, including values in older test-case context. It saves `eval_config.route_policy: "server"`; actual settings come from each turn's returned metrics.
+
+The client accepts these metrics contracts:
+
+- **Version 1:** `route_controls_version: 1`, with boolean `disable_p0` and `disable_p1` recording the effective settings on older backends.
+- **Version 2:** the same effective settings, plus boolean `requested_disable_p0`, `requested_disable_p1`, `global_p0_enabled` and `global_p1_enabled`. Effective disabling is `!global_enabled || requested_disable`. New site requests make no override, so the requested-disable fields must both be `false`.
+
+Missing routing metadata does not fail a run: the UI shows “Not reported” without inventing a route or assessment. Explicitly supplied malformed, inconsistent or unsupported routing contracts still fail validation. Old saved runs keep their original data. Version headings prefer actual per-turn settings; old configuration-only values are explicitly labeled as requested settings, and missing or mixed evidence is not presented as a uniform policy.
+
+`route_trace` and `detected_flags` remain raw evidence. When recorded metrics show detection was disabled, the UI explains that default flags such as `safe` or `regulated` are not a safety or mood assessment. This does not rewrite old flags or hide active P2 or other routes.
+
 **Example — single-turn:**
 
 ```json

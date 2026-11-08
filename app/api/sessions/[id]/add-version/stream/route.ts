@@ -1,4 +1,4 @@
-import { isEvrenFlashModel, validRouteControls } from "@/lib/evren-models";
+import { isEvrenFlashModel } from "@/lib/evren-models";
 import { createClient } from "@/lib/supabase/server";
 import { getMaxConcurrentTestCases, runWithConcurrency } from "@/lib/evren-concurrency";
 import { callEvrenApiWithMeta } from "@/lib/evren";
@@ -100,8 +100,6 @@ export async function POST(
     version_name?: string;
     run_count?: number;
     evren_flash_model?: string;
-    disable_p0?: boolean;
-    disable_p1?: boolean;
     run_comparison?: boolean;
   } = {};
   try {
@@ -110,10 +108,10 @@ export async function POST(
     /* empty body is fine */
   }
   const runComparison = body.run_comparison ?? false;
-  if (!validRouteControls(body)) {
-    return Response.json({ error: "P0/P1 controls must be booleans" }, { status: 400 });
-  }
-  const evalConfig = { flash_model: body.evren_flash_model ?? "gemini-2.5-flash", disable_p0: body.disable_p0 ?? false, disable_p1: body.disable_p1 ?? false };
+  const evalConfig = {
+    flash_model: body.evren_flash_model ?? "gemini-2.5-flash",
+    route_policy: "server" as const,
+  };
   if (body.evren_flash_model !== undefined && !isEvrenFlashModel(body.evren_flash_model)) {
     return Response.json({ error: "Unsupported Evren Flash model" }, { status: 400 });
   }
@@ -248,7 +246,7 @@ export async function POST(
 
           const testCase: TestCase = testCaseFromRow(tc);
 
-          const runPromises = Array.from({ length: runCount }, async () => callEvrenApiWithMeta(evrenModelApiUrl, testCase, evalConfig.flash_model, evalConfig));
+          const runPromises = Array.from({ length: runCount }, async () => callEvrenApiWithMeta(evrenModelApiUrl, testCase, evalConfig.flash_model));
           const runResults = await Promise.allSettled(runPromises);
           const runs: RunEntry[] = [];
 
